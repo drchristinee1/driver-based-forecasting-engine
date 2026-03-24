@@ -1,0 +1,64 @@
+from forecasting_engine.drivers import project_demand, map_to_infrastructure_usage
+from forecasting_engine.pricing import get_pricing
+
+
+def run_forecast(data):
+    """
+    Main forecasting function that:
+    1. Projects demand
+    2. Maps demand to infrastructure usage
+    3. Applies pricing
+    4. Outputs forecast + unit economics
+    """
+
+    # === STEP 1: PROJECT DEMAND ===
+    projected = project_demand(data)
+
+    # === STEP 2: MAP TO INFRASTRUCTURE USAGE ===
+    usage = map_to_infrastructure_usage(projected)
+
+    # === STEP 3: GET PRICING ===
+    pricing = get_pricing()
+
+    # === STEP 4: CALCULATE COST ===
+
+    lambda_cost = (
+        usage["lambda_requests_millions"]
+        * pricing["lambda_cost_per_million_requests"]
+    )
+
+    dynamodb_cost = (
+        usage["dynamodb_transactions_millions"]
+        * pricing["dynamodb_cost_per_million_transactions"]
+    )
+
+    s3_cost = (
+        usage["s3_storage_gb"]
+        * pricing["s3_cost_per_gb"]
+    )
+
+    other_cost = pricing["other_fixed_cost"]
+
+    total_cost = lambda_cost + dynamodb_cost + s3_cost + other_cost
+
+    # === STEP 5: UNIT ECONOMICS ===
+    transactions = projected["transactions"]
+    cost_per_transaction = total_cost / transactions if transactions > 0 else 0
+
+    # === STEP 6: BUILD OUTPUT ===
+    result = {
+        "forecast_month": "next_month",
+        "projected_transactions": projected["transactions"],
+        "projected_api_requests": projected["api_requests"],
+        "projected_storage_gb": projected["storage_gb"],
+        "projected_total_cost": round(total_cost, 2),
+        "cost_breakdown": {
+            "lambda": round(lambda_cost, 2),
+            "dynamodb": round(dynamodb_cost, 2),
+            "s3": round(s3_cost, 2),
+            "other": round(other_cost, 2)
+        },
+        "cost_per_transaction": round(cost_per_transaction, 6)
+    }
+
+    return result
