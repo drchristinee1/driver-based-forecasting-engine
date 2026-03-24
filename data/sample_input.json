@@ -1,0 +1,6 @@
+{
+  "transactions": 1000000,
+  "api_requests": 5000000,
+  "storage_gb": 20000,
+  "growth_rate": 0.15
+}
